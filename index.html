@@ -1,49 +1,233 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Open-Meteo Weather App</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkyCast — Weather</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body {
+    min-height: 100vh;
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 40px 16px;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: #fff;
+    transition: background 1s ease;
+  }
+  body.day   { background: linear-gradient(135deg, #2980b9, #6dd5fa, #ffffff); color: #1a2a3a; }
+  body.night { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #fff; }
+
+  .app { width: 100%; max-width: 720px; }
+
+  /* Search bar */
+  .search-box { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .search-box input {
+    flex: 1; min-width: 180px; padding: 12px 16px; border: none; border-radius: 12px;
+    font-size: 1rem; outline: none;
+  }
+  .search-box button {
+    padding: 12px 18px; border: none; border-radius: 12px; cursor: pointer;
+    background: #ff9f43; color: #fff; font-weight: 600; font-size: 0.95rem;
+    transition: transform .15s;
+  }
+  .search-box button:hover { transform: scale(1.05); }
+
+  /* Suggestions dropdown */
+  .suggestions { background: #fff; color: #333; border-radius: 12px; overflow: hidden; margin-top: -16px; margin-bottom: 20px; display: none; }
+  .suggestions div { padding: 10px 16px; cursor: pointer; }
+  .suggestions div:hover { background: #f0f0f0; }
+
+  /* Current weather card */
+  .current {
+    text-align: center; padding: 32px 20px; border-radius: 20px;
+    background: rgba(255,255,255,0.12); backdrop-filter: blur(10px);
+    margin-bottom: 24px;
+  }
+  body.day .current { background: rgba(255,255,255,0.55); }
+  .current .city { font-size: 1.6rem; font-weight: 600; }
+  .current .temp { font-size: 4.5rem; font-weight: 300; line-height: 1.1; }
+  .current .icon { font-size: 4rem; margin: 8px 0; }
+  .current .desc { font-size: 1.15rem; opacity: .9; }
+  .current .meta { margin-top: 16px; display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-size: .95rem; opacity: .95; }
+
+  /* Hourly chart */
+  .chart-card, .forecast { padding: 20px; border-radius: 20px; background: rgba(255,255,255,0.12); margin-bottom: 24px; }
+  body.day .chart-card, body.day .forecast { background: rgba(255,255,255,0.55); }
+  .chart-card h3, .forecast h3 { margin-bottom: 12px; font-size: 1rem; opacity: .85; }
+  canvas { width: 100%; height: 120px; }
+
+  /* 7-day forecast */
+  .days { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+  .day-card {
+    min-width: 92px; text-align: center; padding: 14px 8px; border-radius: 14px;
+    background: rgba(255,255,255,0.15); flex-shrink: 0;
+  }
+  body.day .day-card { background: rgba(255,255,255,0.6); }
+  .day-card .d-icon { font-size: 1.8rem; margin: 6px 0; }
+  .day-card .d-temps { font-size: .85rem; }
+  .day-card .d-temps b { font-weight: 600; }
+
+  .unit-toggle { position: fixed; top: 16px; right: 16px; padding: 8px 14px; border-radius: 10px;
+    border: none; background: rgba(255,255,255,0.2); color: inherit; cursor: pointer; font-weight: 600; }
+
+  .error { background: #ff5252; color: #fff; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: none; }
+  .loading { text-align: center; padding: 20px; opacity: .8; }
+</style>
 </head>
 <body>
 
-    <div class="app-container">
-        <h1>⛅ Open-Meteo Weather</h1>
+<div class="app">
+  <button class="unit-toggle" id="unitBtn">°C / °F</button>
+  <div class="search-box">
+    <input id="cityInput" type="text" placeholder="Search a city… e.g. Tokyo" autocomplete="off">
+    <button onclick="searchCity()">Search</button>
+    <button onclick="useLocation()">📍 My Location</button>
+  </div>
+  <div class="suggestions" id="suggestions"></div>
+  <div class="error" id="error"></div>
+  <div id="content"><div class="loading">Search for a city or use your location ↑</div></div>
+</div>
 
-        <div class="search-bar">
-            <input type="text" id="cityInput" placeholder="Enter city name (e.g., London, Tokyo)…" autocomplete="off">
-            <button id="searchBtn">Search</button>
-        </div>
+<script>
+const WMO = { 0:["Clear sky","☀️"],1:["Mainly clear","🌤️"],2:["Partly cloudy","⛅"],3:["Overcast","☁️"],
+  45:["Fog","🌫️"],48:["Rime fog","🌫️"],51:["Light drizzle","🌦️"],53:["Drizzle","🌦️"],55:["Heavy drizzle","🌧️"],
+  61:["Light rain","🌦️"],63:["Rain","🌧️"],65:["Heavy rain","🌧️"],66:["Freezing rain","🌧️"],67:["Freezing rain","🌧️"],
+  71:["Light snow","🌨️"],73:["Snow","🌨️"],75:["Heavy snow","❄️"],77:["Snow grains","🌨️"],
+  80:["Light showers","🌦️"],81:["Showers","🌧️"],82:["Violent showers","⛈️"],85:["Snow showers","🌨️"],86:["Snow showers","❄️"],
+  95:["Thunderstorm","⛈️"],96:["Thunderstorm + hail","⛈️"],99:["Thunderstorm + hail","⛈️"] };
 
-        <div id="errorMessage" class="error-message"></div>
-        <div id="loading" class="loading">Fetching weather data…</div>
+let isFahrenheit = false;
+let lastLat = null, lastLon = null, lastName = "";
 
-        <div id="weatherContent" class="hidden">
-            <!-- Current Weather -->
-            <div class="current-weather" id="currentWeather">
-                <div class="location-name" id="locationName"></div>
-                <div class="location-detail" id="locationDetail"></div>
-                <div class="current-main">
-                    <span class="current-icon" id="currentIcon">☀️</span>
-                    <div>
-                        <div class="current-temp" id="currentTemp"></div>
-                        <div class="current-desc" id="currentDesc"></div>
-                    </div>
-                </div>
-                <div class="current-meta" id="currentMeta"></div>
-            </div>
+const $ = id => document.getElementById(id);
+const deg = c => isFahrenheit ? c * 9/5 + 32 : c;
+const unit = () => isFahrenheit ? "°F" : "°C";
 
-            <!-- Hourly Forecast -->
-            <div class="section-title">Hourly Forecast (next 24h)</div>
-            <div class="hourly-scroll" id="hourlyForecast"></div>
+$("unitBtn").onclick = () => {
+  isFahrenheit = !isFahrenheit;
+  if (lastLat !== null) fetchWeather(lastLat, lastLon, lastName);
+};
 
-            <!-- Daily Forecast -->
-            <div class="section-title">7-Day Forecast</div>
-            <div class="daily-list" id="dailyForecast"></div>
-        </div>
+// --- City search with suggestions ---
+async function searchCity() {
+  const q = $("cityInput").value.trim();
+  if (!q) return;
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=en`);
+    const d = await r.json();
+    if (!d.results?.length) return showError("City not found.");
+    const s = $("suggestions");
+    s.innerHTML = d.results.map((c,i) =>
+      `<div onclick="pickCity(${i})">${c.name}${c.country ? ", " + c.country : ""}</div>`).join("");
+    s.dataset.results = JSON.stringify(d.results);
+    s.style.display = "block";
+  } catch { showError("Search failed. Check your connection."); }
+}
+function pickCity(i) {
+  const c = JSON.parse($("suggestions").dataset.results)[i];
+  $("suggestions").style.display = "none";
+  fetchWeather(c.latitude, c.longitude, `${c.name}${c.country ? ", " + c.country : ""}`);
+}
+$("cityInput").addEventListener("keydown", e => { if (e.key === "Enter") searchCity(); });
+
+// --- Geolocation ---
+function useLocation() {
+  if (!navigator.geolocation) return showError("Geolocation not supported.");
+  navigator.geolocation.getCurrentPosition(
+    p => fetchWeather(p.coords.latitude, p.coords.longitude, "Your Location"),
+    () => showError("Location permission denied.")
+  );
+}
+
+// --- Main weather fetch ---
+async function fetchWeather(lat, lon, name) {
+  lastLat = lat; lastLon = lon; lastName = name;
+  $("error").style.display = "none";
+  $("content").innerHTML = `<div class="loading">Loading weather…</div>`;
+  try {
+    const params = new URLSearchParams({
+      latitude: lat, longitude: lon,
+      current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,pressure_msl",
+      hourly: "temperature_2m",
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+      timezone: "auto",
+      forecast_days: 7,
+      temperature_unit: isFahrenheit ? "fahrenheit" : "celsius"
+    });
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    render(d, name);
+  } catch { showError("Failed to load weather data."); }
+}
+
+// --- Render ---
+function render(d, name) {
+  const c = d.current;
+  const [desc, icon] = WMO[c.weather_code] || ["Unknown","❓"];
+  document.body.className = c.is_day ? "day" : "night";
+
+  const now = new Date();
+  const hourly = d.hourly.time.map((t,i) => ({ t: new Date(t), temp: d.hourly.temperature_2m[i] }))
+    .filter(h => h.t >= now).slice(0, 24);
+
+  $("content").innerHTML = `
+    <div class="current">
+      <div class="city">${name}</div>
+      <div class="temp">${Math.round(deg(c.temperature_2m))}${unit()}</div>
+      <div class="icon">${icon}</div>
+      <div class="desc">${desc}</div>
+      <div class="meta">
+        <span>🌡️ Feels like ${Math.round(deg(c.apparent_temperature))}${unit()}</span>
+        <span>💧 ${c.relative_humidity_2m}%</span>
+        <span>💨 ${c.wind_speed_10m} km/h</span>
+        <span>📊 ${Math.round(c.pressure_msl)} hPa</span>
+      </div>
     </div>
+    <div class="chart-card"><h3>Next 24 hours</h3><canvas id="chart"></canvas></div>
+    <div class="forecast"><h3>7-Day Forecast</h3><div class="days">
+      ${d.daily.time.map((t,i) => {
+        const [,di] = WMO[d.daily.weather_code[i]] || ["","❓"];
+        return `<div class="day-card">
+          <div>${new Date(t).toLocaleDateString(undefined,{weekday:'short'})}</div>
+          <div class="d-icon">${di}</div>
+          <div class="d-temps"><b>${Math.round(deg(d.daily.temperature_2m_max[i]))}°</b> / ${Math.round(deg(d.daily.temperature_2m_min[i]))}°</div>
+          <div class="d-temps" style="opacity:.8">💧${d.daily.precipitation_probability_max[i] ?? 0}%</div>
+        </div>`;
+      }).join("")}
+    </div></div>`;
 
+  drawChart(hourly);
+}
+
+// --- Simple temperature line chart (no library needed) ---
+function drawChart(data) {
+  const cv = $("chart"), ctx = cv.getContext("2d");
+  const W = cv.width = cv.offsetWidth * 2, H = cv.height = 240; // 2x for sharpness
+  const pad = 30, temps = data.map(h => h.temp);
+  const min = Math.min(...temps), max = Math.max(...temps), range = (max - min) || 1;
+  const x = i => pad + i * (W - 2*pad) / (data.length - 1);
+  const y = t => H - pad - ((t - min) / range) * (H - 2*pad);
+
+  ctx.lineWidth = 4; ctx.strokeStyle = "#ff9f43"; ctx.lineJoin = "round"; ctx.beginPath();
+  data.forEach((h,i) => i ? ctx.lineTo(x(i), y(h.temp)) : ctx.moveTo(x(i), y(h.temp)));
+  ctx.stroke();
+
+  ctx.fillStyle = document.body.className === "day" ? "#1a2a3a" : "#fff";
+  ctx.font = "22px system-ui"; ctx.textAlign = "center";
+  data.forEach((h,i) => {
+    if (i % 4 === 0) ctx.fillText(Math.round(deg(h.temp)) + "°", x(i), y(h.temp) - 14);
+    if (i % 4 === 0) ctx.fillText(h.t.getHours() + ":00", x(i), H - 8);
+  });
+}
+
+function showError(msg) {
+  $("error").textContent = msg;
+  $("error").style.display = "block";
+}
+
+// Auto-load on open with geolocation prompt (optional convenience)
+// useLocation();
+</script>
 </body>
 </html>
