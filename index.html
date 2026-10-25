@@ -1,67 +1,49 @@
-<!doctype html>
-<html lang="en" data-theme="dark">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Atmos – Weather</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open-Meteo Weather App</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
 </head>
-<body data-sky="clear">
-<div class="fx" id="fx" aria-hidden="true"></div>
+<body>
 
-<header class="bar glass">
-  <a class="logo" href="./" aria-label="Atmos home">◐<span> Atmos</span></a>
-  <div class="search">
-    <input id="q" type="search" placeholder="Search city…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sug" aria-label="Search city">
-    <ul id="sug" role="listbox" hidden></ul>
-  </div>
-  <button id="geo" title="Use my location" aria-label="Use my location">📍</button>
-  <button id="unit" aria-label="Switch between Celsius and Fahrenheit">°C</button>
-  <button id="theme" aria-label="Switch theme">☀️</button>
-  <button id="cfg" aria-label="Open settings">⚙️</button>
-</header>
+    <div class="app-container">
+        <h1>⛅ Open-Meteo Weather</h1>
 
-<main id="app">
-  <p id="empty" class="glass note">Search for a city or tap 📍 to see its forecast.</p>
-  <div id="err" class="glass note" hidden><span id="errmsg"></span> <button id="retry">Retry</button></div>
-  <div id="sk" hidden><div class="glass sk" style="height:210px"></div><div class="glass sk" style="height:210px"></div></div>
+        <div class="search-bar">
+            <input type="text" id="cityInput" placeholder="Enter city name (e.g., London, Tokyo)…" autocomplete="off">
+            <button id="searchBtn">Search</button>
+        </div>
 
-  <div class="dash" id="dash" hidden>
-    <section class="glass hero" aria-live="polite">
-      <div>
-        <h1 id="city"></h1>
-        <p id="when" class="mu"></p>
-        <div class="temp" id="temp"></div>
-        <p id="cond" class="cond"></p>
-        <p id="sub" class="mu"></p>
-        <p id="sum"></p>
-      </div>
-      <div class="ico" id="ico" aria-hidden="true"></div>
-    </section>
-    <section class="details" id="det" aria-label="Weather details"></section>
-    <section class="glass pad">
-      <h2>Next 24 hours</h2>
-      <div class="hs"><div class="hin"><svg id="ch" role="img" aria-label="Hourly temperature trend"></svg><div id="tip" hidden></div><ol id="hrs"></ol></div></div>
-    </section>
-    <section class="glass pad">
-      <h2>7-day forecast</h2>
-      <ul id="days"></ul>
-    </section>
-    <footer><span id="stat"></span><button id="ref">↻ Refresh</button></footer>
-  </div>
-</main>
+        <div id="errorMessage" class="error-message"></div>
+        <div id="loading" class="loading">Fetching weather data…</div>
 
-<dialog id="dlg">
-  <form method="dialog" class="glass">
-    <h2>Settings</h2>
-    <label>Wind speed <select id="sw"><option value="kmh">km/h</option><option value="mph">mph</option><option value="ms">m/s</option></select></label>
-    <label>Visibility <select id="sd"><option value="km">km</option><option value="mi">miles</option></select></label>
-    <label>Clock <select id="sc"><option value="12">12-hour</option><option value="24">24-hour</option></select></label>
-    <button type="button" id="clr">Clear recent searches</button>
-    <button>Done</button>
-  </form>
-</dialog>
-<div id="toast" role="status" aria-live="polite"></div>
-<script src="script.js"></script>
+        <div id="weatherContent" class="hidden">
+            <!-- Current Weather -->
+            <div class="current-weather" id="currentWeather">
+                <div class="location-name" id="locationName"></div>
+                <div class="location-detail" id="locationDetail"></div>
+                <div class="current-main">
+                    <span class="current-icon" id="currentIcon">☀️</span>
+                    <div>
+                        <div class="current-temp" id="currentTemp"></div>
+                        <div class="current-desc" id="currentDesc"></div>
+                    </div>
+                </div>
+                <div class="current-meta" id="currentMeta"></div>
+            </div>
+
+            <!-- Hourly Forecast -->
+            <div class="section-title">Hourly Forecast (next 24h)</div>
+            <div class="hourly-scroll" id="hourlyForecast"></div>
+
+            <!-- Daily Forecast -->
+            <div class="section-title">7-Day Forecast</div>
+            <div class="daily-list" id="dailyForecast"></div>
+        </div>
+    </div>
+
 </body>
 </html>
